@@ -7,9 +7,12 @@ const char* ssid = "BELL984";
 const char* password = "9F3CDAF9";
 const char* brokerUser = "nicolasgibeault@gmail.com";
 const char* brokerPassword = "f10b5df0";
-const char* broker = "mqtt.dioty.co";
-const char* outTopic = "/nicolasgibeault@gmail.com/out";
-const char* inTopic = "/nicolasgibeault@gmail.com/in";
+const char* broker = "70.52.17.228";
+const char* outTopic1 = "/out";
+const char* outTopic2 = "/out2";
+const char* outTopic3 = "/out3";
+const char* outTopic4 = "/out4";
+const char* inTopic = "/in";
 char message[50];
 int preset = 0;
 std::string s;
@@ -18,8 +21,50 @@ DynamicJsonDocument doc(1024);
 WiFiClient espClient;
 PubSubClient client(espClient);
 long triggerMsg, timeMsg;
-int count = 0;
+int state = 0;
+int voltage = 0;
+int current = 0;
+int errorcom = 0;
 
+
+void sendmsgmqtt(){
+
+    
+    sniprintf(message, 75, "state: %ld", state);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic1, message);
+    timeMsg = millis();
+    if (state==0)
+    {
+      state = 1;
+    }
+    else
+    {
+      state =0;
+    }
+    
+    
+
+    sniprintf(message, 75, "voltage: %ld", voltage);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic2, message);
+    timeMsg = millis();
+
+    sniprintf(message, 75, "state: %ld", current);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic3, message);
+    timeMsg = millis();
+
+    sniprintf(message, 75, "state: %ld", errorcom);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic4, message);
+    timeMsg = millis();
+    
+}
 void setupWifi(){
   delay(100);
   Serial.print("\nConnection a ");
@@ -41,7 +86,7 @@ void reconnect(){
   while (!client.connected()){
     Serial.print("\n connection au broker ");
     Serial.println(broker);
-    if(client.connect("personnel", brokerUser, brokerPassword)){
+    if(client.connect("707", brokerUser, brokerPassword)){
       Serial.print("\nconnection etablie sur ");
       Serial.println(broker);
       client.subscribe(inTopic);
@@ -80,17 +125,7 @@ void callback(char* topic, byte* payload, unsigned int length){
 }
 
 
-/*void stringToChar(){
-    int n = s.length();
-     // declaring character array
-    char char_array[n + 1];
-     // copying the contents of the
-    // string to char array
-    strcpy(char_array, s.c_str());
-     for (int i = 0; i < n; i++){
-        cout << char_array[i];
-     }
-}*/
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -112,11 +147,9 @@ void loop() {
   }
   client.loop();
 
-
-   /* sniprintf(message, 75, "count: %ld", count);
-    Serial.print("\n message envoye: ");
-    Serial.println(message);
-    client.publish(outTopic, message);
-    timeMsg = millis();*/
+  // sends each 8 seconds da ta to database
+  delay(8000);
+  sendmsgmqtt();
   
 }
+
