@@ -3,12 +3,13 @@
 #include <Wire.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 
 //WIFI credentials to enter by user
-char ssid[512] = "BELL984";
-char password[512] = "9F3CDAF9";
+static char ssid[512] = "";
+static char password[512] = "";
 
 /* Put your SSID & Password for first use of esp32 */
 const char* ssidesp32 = "ESP32";  // Enter SSID here
@@ -45,7 +46,7 @@ h1 {
 </style>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   </head><body>
-  <h1>MODULY Wifi Setup</h1><br>
+  <h1>Humanitech Wifi Setup</h1><br>
   <h2>Insert WIFI credentials</h2>
   <form action="/get">
     Wifi_ssid : <input type="text" name="Wifi_ssid"><br><br>
@@ -125,26 +126,6 @@ void sendmsgmqtt(){
     {
       state =0;
     }
-    
-    
-
-    sniprintf(message, 75, "voltage: %ld", voltage);
-    Serial.print("\n message envoye: ");
-    Serial.println(message);
-    client.publish(outTopic2, message);
-    timeMsg = millis();
-
-    sniprintf(message, 75, "current: %ld", current);
-    Serial.print("\n message envoye: ");
-    Serial.println(message);
-    client.publish(outTopic3, message);
-    timeMsg = millis();
-
-    sniprintf(message, 75, "error: %ld", errorcom);
-    Serial.print("\n message envoye: ");
-    Serial.println(message);
-    client.publish(outTopic4, message);
-    timeMsg = millis();
     
 }
 
