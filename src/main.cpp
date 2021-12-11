@@ -1,15 +1,8 @@
-#include <Arduino.h>
-#include <WiFi.h>
-#include <Wire.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
-
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
+#include <main.h>
 
 //WIFI credentials to enter by user
-static char ssid[512] = "";
-static char password[512] = "";
+static char ssid[512] = "BELL984";
+static char password[512] = "9F3CDAF9";
 
 /* Put your SSID & Password for first use of esp32 */
 const char* ssidesp32 = "ESP32";  // Enter SSID here
@@ -59,13 +52,14 @@ void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
 //MQTT communication declaration
-const char* brokerUser = "";
-const char* brokerPassword = "";
+const char* brokerUser = "BELL984";
+const char* brokerPassword = "9F3CDAF9";
 const char* broker = "70.52.17.228";
-const char* outTopic1 = "/out";
-const char* outTopic2 = "/out2";
-const char* outTopic3 = "/out3";
-const char* outTopic4 = "/out4";
+const char* outTopic1 = "/state";
+const char* outTopic2 = "/voltage";
+const char* outTopic3 = "/current";
+const char* outTopic4 = "/charge";
+const char* outTopic5 = "/error";
 const char* inTopic = "/in";
 char message[50];
 int preset = 0;
@@ -84,28 +78,36 @@ long triggerMsg, timeMsg;
 int state = 0;
 int voltage = 0;
 int current = 0;
+int charge = 0;
 int errorcom = 0;
 
 //i2c declaration
 
 int count = 0;
-byte ADDRESS_SLAVE = 0X27; 
-byte REGISTER_XY = 0X04;
-byte READ_LENGTH = 1;
+byte ADDRESS_SLAVE = 0X22; 
+byte READ_LENGTH = 4;
 
 void Prompti2c(){
-  Wire.begin();
-  Wire.setClock(100000); // set I2C 'full-speed'
+
   Wire.beginTransmission(ADDRESS_SLAVE);  
-  Wire.write(REGISTER_XY);  // set register for read
+  //Wire.write(FUSB302_D_Register_DeviceID);  // set register for read
+  //Wire.write(FUSB302_D_Register_Switches0);  // set register for read
+  //Wire.write(FUSB302_D_Register_Switches1);  // set register for read
+  Wire.write(FUSB302_D_Register_Measure);  // set register for read
+  //Wire.write(FUSB302_D_Register_Status0a);  // set register for read
+  //Wire.write(FUSB302_D_Register_Status1a);  // set register for read
+  Wire.write(FUSB302_D_Register_Status0);  // set register for read
+  Wire.write(FUSB302_D_Register_Status1);  // set register for read
+  Wire.write(FUSB302_D_Register_Control0);  // set register for read
   Wire.endTransmission();
 
-         Serial.println("Adresse 0x04");
-    Wire.requestFrom(ADDRESS_SLAVE,READ_LENGTH); 
+   Wire.requestFrom(ADDRESS_SLAVE,READ_LENGTH); 
    byte buff[READ_LENGTH];    
    Wire.readBytes(buff, READ_LENGTH);
+   //wire.writeBytes();
    for (int i = 0; i < READ_LENGTH; i++) {
      Serial.println(buff[i], BIN);
+     buff[i]=0;
    }
    Serial.println("FIN");
    }
@@ -126,6 +128,27 @@ void sendmsgmqtt(){
     {
       state =0;
     }
+        sniprintf(message, 75, "voltage: %ld", voltage);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic2, message);
+    timeMsg = millis();
+            sniprintf(message, 75, "current: %ld", current);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic3, message);
+    timeMsg = millis();
+            sniprintf(message, 75, "charge: %ld", charge);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic4, message);
+    timeMsg = millis();
+                sniprintf(message, 75, "error: %ld", errorcom);
+    Serial.print("\n message envoye: ");
+    Serial.println(message);
+    client.publish(outTopic5, message);
+    timeMsg = millis();
+
     
 }
 
@@ -243,7 +266,8 @@ void callback(char* topic, byte* payload, unsigned int length){
     
 }
 
-
+#define I2C_SDA 21
+#define I2C_SCL 22
 
 void setup() {
   // put your setup code here, to run once:
@@ -252,7 +276,8 @@ void setup() {
   setupWifi();
   client.setServer(broker, 707);
   client.setCallback(callback);
-  
+  Wire.begin(I2C_SDA, I2C_SCL,100000);
+     delay(1000);
 
 
 }
@@ -267,8 +292,8 @@ void loop() {
   }
   client.loop();
 
-  // sends each 8 seconds da ta to database
-  delay(7000);
+  // sends each 2 seconds da ta to database
+  delay(2000);
   sendmsgmqtt();
 
 }
