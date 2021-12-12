@@ -1,7 +1,7 @@
 #include <main.h>
 //WIFI credentials to enter by user
-static char ssid[512] = "BELL984";
-static char password[512] = "9F3CDAF9";
+static char ssid[512];
+static char password[512] ;
 
 /* Put your SSID & Password for first use of esp32 */
 const char* ssidesp32 = "ESP32";  // Enter SSID here
@@ -83,6 +83,53 @@ int errorcom ;
 //i2c declaration
 byte ADDRESS_SLAVE = 0X22; 
 FUSB302 usbc;
+
+//setup code here, to run once:
+void setup() {
+  //serial port setting
+  Serial.begin(115200);
+  //set GPIO if needed
+  pinMode(LED, OUTPUT);
+  //set wifi
+  setupWifi();
+  //set Broker and callback
+  client.setServer(broker, 707);
+  client.setCallback(callback);
+  //setup for USBC devboard
+  usbc.init();
+
+
+
+}
+
+
+void loop() {
+
+  //go grab the info from charger
+  Prompti2c();
+   delay(1000);
+   // if disconnected from MQTT broker, retry with procedure
+  if (!client.connected()){
+    reconnect();
+  }
+  client.loop();
+
+  // after 2 more seconds data to database
+  delay(2000);
+  sendmsgmqtt();
+// if there is a wifi connection, Flash the led
+if(WiFi.status() != WL_CONNECTED){
+    digitalWrite(LED, LOW);
+  }
+  else
+  {
+  digitalWrite(LED, HIGH);
+  delay(500);
+  digitalWrite(LED, LOW);
+  }
+  
+}
+
 void Prompti2c(){
 
 // get chip id and if not the ID of the board, set a comm error
@@ -314,52 +361,5 @@ void callback(char* topic, byte* payload, unsigned int length){
     }
     Serial.println();   
     
-}
-
-
-//setup code here, to run once:
-void setup() {
-  //serial port setting
-  Serial.begin(115200);
-  //set GPIO if needed
-  pinMode(LED, OUTPUT);
-  //set wifi
-  setupWifi();
-  //set Broker and callback
-  client.setServer(broker, 707);
-  client.setCallback(callback);
-  //setup for USBC devboard
-  usbc.init();
-
-
-
-}
-
-
-void loop() {
-
-  //go grab the info from charger
-  Prompti2c();
-   delay(1000);
-   // if disconnected from MQTT broker, retry with procedure
-  if (!client.connected()){
-    reconnect();
-  }
-  client.loop();
-
-  // after 2 more seconds data to database
-  delay(2000);
-  sendmsgmqtt();
-// if there is a wifi connection, Flash the led
-if(WiFi.status() != WL_CONNECTED){
-    digitalWrite(LED, LOW);
-  }
-  else
-  {
-  digitalWrite(LED, HIGH);
-  delay(500);
-  digitalWrite(LED, LOW);
-  }
-  
 }
 
