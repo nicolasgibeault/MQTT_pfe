@@ -1,8 +1,7 @@
 #include <main.h>
-
 //WIFI credentials to enter by user
-static char ssid[512] = ""; //= "BELL984";
-static char password[512] = ""; // = "9F3CDAF9";
+static char ssid[512] = "BELL984";
+static char password[512] = "9F3CDAF9";
 
 /* Put your SSID & Password for first use of esp32 */
 const char* ssidesp32 = "ESP32";  // Enter SSID here
@@ -52,8 +51,8 @@ void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
 }
 //MQTT communication declaration
-const char* brokerUser = "BELL984";
-const char* brokerPassword = "9F3CDAF9";
+const char* brokerUser = "";
+const char* brokerPassword = "";
 const char* broker = "70.52.17.228";
 const char* outTopic1 = "/state";
 const char* outTopic2 = "/voltage";
@@ -79,68 +78,105 @@ int state = 0;
 int voltage = 0;
 int current = 0;
 int charge = 0;
-int errorcom = 0;
+int errorcom ;
 
 //i2c declaration
 
 int count = 0;
 byte ADDRESS_SLAVE = 0X22; 
 byte READ_LENGTH = 8;
+FUSB302 usbc;
+void Prompti2c(){
 
-int Prompti2c(){
+    int usb_pd_message_header;
+    uint32_t  usb_pd_message_buffer[10];
+    int chip_id;
+  usbc.get_chip_id(&chip_id);
+  Serial.print("FUSB302 ID = 0x");
+  Serial.println(chip_id, HEX);
+  if (chip_id != 0xA0){
+    errorcom =1;
+  }
+  else{
+    errorcom =0;
+  }
 
-int errorcode =0 ;
-  Wire.beginTransmission(ADDRESS_SLAVE);  
-  Wire.write(FUSB302_D_Register_DeviceID);  // set register for read
-  Wire.write(FUSB302_D_Register_Switches0);  // set register for read
-  Wire.write(FUSB302_D_Register_Switches1);  // set register for read
-  Wire.write(FUSB302_D_Register_Measure);  // set register for read
-  Wire.write(FUSB302_D_Register_Status0a);  // set register for read
-  Wire.write(FUSB302_D_Register_Status1a);  // set register for read
-  Wire.write(FUSB302_D_Register_Status0);  // set register for read
-  Wire.write(FUSB302_D_Register_Status1);  // set register for read
-  Wire.write(FUSB302_D_Register_Control0);  // set register for read
-  Wire.endTransmission();
+  usbc.pd_reset();
+     delay(1000);
+  //usbc.init();
+     delay(1000);
 
-   Wire.requestFrom(ADDRESS_SLAVE,READ_LENGTH); 
-   byte buff[READ_LENGTH];    
-   Wire.readBytes(buff, READ_LENGTH);
 
-/// if the device id is zero, then the fetch did not work and an error has occured 
+  int cc1_meas, cc2_meas;
+
+  usbc.get_cc(&cc1_meas, &cc2_meas);
+  Serial.print("CC1 level = ");
+  switch (cc1_meas) {
+    case TYPEC_CC_VOLT_OPEN :
+      Serial.println("Open");
+      break;
+    case TYPEC_CC_VOLT_RA :
+      Serial.println("Ra pull-down");
+      break;
+    case TYPEC_CC_VOLT_RD :
+      Serial.println("Rd pull-down");
+      break;
+    case TYPEC_CC_VOLT_SNK_DEF :
+      Serial.println("Connected with default power");
+      break;
+    case TYPEC_CC_VOLT_SNK_1_5 :
+      Serial.println("Connected with 1.5A at 5V");
+      break;
+    case TYPEC_CC_VOLT_SNK_3_0 :
+      Serial.println("Connected with 3.0A at 5V");
+      break;
+    default :
+      Serial.println("Unknown");
+      break;
+  }
+
+  Serial.print("CC2 level = ");
+  switch (cc2_meas) {
+    case TYPEC_CC_VOLT_OPEN :
+      Serial.println("Open");
+      break;
+    case TYPEC_CC_VOLT_RA :
+      Serial.println("Ra pull-down");
+      break;
+    case TYPEC_CC_VOLT_RD :
+      Serial.println("Rd pull-down");
+      break;
+    case TYPEC_CC_VOLT_SNK_DEF :
+      Serial.println("Connected with default power");
+      break;
+    case TYPEC_CC_VOLT_SNK_1_5 :
+      Serial.println("Connected with 1.5A at 5V");
+      current =1;
+      voltage = 5;
+      break;
+    case TYPEC_CC_VOLT_SNK_3_0 :
+      Serial.println("Connected with 3.0A at 5V");
+      current =3;
+      voltage = 5;
+      break;
+    default :
+      Serial.println("Unknown");
+      current =0;
+      voltage = 0;
+      break;
+  }
+
+  if (cc1_meas > cc2_meas) {
+    usbc.set_polarity(0);
+  } else {
+    usbc.set_polarity(1);
+  }
  
-   Serial.print("\n recieved from I2C: ");
-  for (int i = 0; i < READ_LENGTH; i++) {
-     Serial.println(buff[i], BIN);
-     
-     switch (i)
-     {
-      case 0:
-        if (buff[i] == 0){
-          errorcom=1;
-        }
-        else{
-          errorcom=0;
-        }
-       break;
-      case 3:
-       voltage = 5;
-       break;
-      case 6:
-       current = buff[i] % 3;
-       break;
-      case 7:
-       charge =( charge + 1) % 100;
-       break;
-     default:
-       break;
-    buff[i] =0;
-     }
 
-   }
    Serial.println("FIN");
 }
 
-void sendmsgmqtt(int errori2c){
+void sendmsgmqtt(){
 
     
     sniprintf(message, 75, "state: %ld", state);
@@ -148,36 +184,30 @@ void sendmsgmqtt(int errori2c){
     Serial.println(message);
     client.publish(outTopic1, message);
     timeMsg = millis();
-    if (state==0)
-    {
-      state = 1;
-    }
-    else
-    {
-      state =0;
-    }
+
         sniprintf(message, 75, "voltage: %ld", voltage);
-    Serial.print("\n message envoye: ");
+    Serial.print("message envoye: ");
     Serial.println(message);
     client.publish(outTopic2, message);
     timeMsg = millis();
+
             sniprintf(message, 75, "current: %ld", current);
-    Serial.print("\n message envoye: ");
+    Serial.print("message envoye: ");
     Serial.println(message);
     client.publish(outTopic3, message);
     timeMsg = millis();
+
             sniprintf(message, 75, "charge: %ld", charge);
-    Serial.print("\n message envoye: ");
+    Serial.print("message envoye: ");
     Serial.println(message);
     client.publish(outTopic4, message);
     timeMsg = millis();
-                sniprintf(message, 75, "error: %ld", errori2c);
-    Serial.print("\n message envoye: ");
+
+                sniprintf(message, 75, "error: %ld", errorcom);
+    Serial.print("message envoye: ");
     Serial.println(message);
     client.publish(outTopic5, message);
     timeMsg = millis();
-
-    
 }
 
 void wifipromptcredentials(){
@@ -268,20 +298,8 @@ void reconnect(){
 
     }
   }
-  {
-    /* code */
-  }
-  
 }
-void decodePayload (){
-    deserializeJson(doc, s);
-    serializeJsonPretty(doc, Serial);
-  JsonObject obj = doc.as<JsonObject>();
-  long age = obj[String("age")];
-  Serial.println();
-  Serial.println(age);
 
-}
 void callback(char* topic, byte* payload, unsigned int length){
     Serial.print("\n message recu; ");
     Serial.println(topic);
@@ -289,14 +307,11 @@ void callback(char* topic, byte* payload, unsigned int length){
       Serial.print((char) payload[i]);
       s +=((char) payload[i]);
     }
-    Serial.println();
-    decodePayload ();
-    
+    Serial.println();   
     
 }
 
-#define I2C_SDA 21
-#define I2C_SCL 22
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -305,17 +320,18 @@ void setup() {
   setupWifi();
   client.setServer(broker, 707);
   client.setCallback(callback);
-  Wire.begin(I2C_SDA, I2C_SCL,100000);
-     delay(1000);
+  //setup for USBC devboard
+  usbc.init();
+
 
 
 }
 
-  int errori2c;
+
 void loop() {
 
   //go grab the info from charger
- errori2c= Prompti2c();
+  Prompti2c();
    delay(1000);
   if (!client.connected()){
     reconnect();
@@ -324,7 +340,7 @@ void loop() {
 
   // sends each 2 seconds da ta to database
   delay(2000);
-  sendmsgmqtt(errori2c);
+  sendmsgmqtt();
 
 }
 

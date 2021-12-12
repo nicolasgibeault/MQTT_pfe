@@ -3,10 +3,10 @@
 #include <Wire.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-
+#include <USB_TCPM.h>
+#include <FUSB302.h>
 
 #define	 FUSB302_D_Register_DeviceID 	0x01
 #define	 FUSB302_D_Register_Switches0 	0x02
