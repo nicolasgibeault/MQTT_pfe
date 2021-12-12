@@ -139,6 +139,8 @@ void Prompti2c(){
   switch (cc2_meas) {
     case TYPEC_CC_VOLT_OPEN :
       Serial.println("Open");
+      current =0;
+      voltage = 0;
       break;
     case TYPEC_CC_VOLT_RA :
       Serial.println("Ra pull-down");
