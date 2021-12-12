@@ -73,7 +73,7 @@ IPAddress adrr(70,52,17,228);
 PubSubClient client(adrr, portnum, espClient);
 long triggerMsg, timeMsg;
 
-//declaration variables a communiquer
+//declaration variables to talk with
 int state = 0;
 int voltage = 0;
 int current = 0;
@@ -81,15 +81,11 @@ int charge = 0;
 int errorcom ;
 
 //i2c declaration
-
-int count = 0;
 byte ADDRESS_SLAVE = 0X22; 
-byte READ_LENGTH = 8;
 FUSB302 usbc;
 void Prompti2c(){
 
-    int usb_pd_message_header;
-    uint32_t  usb_pd_message_buffer[10];
+// get chip id and if not the ID of the board, set a comm error
     int chip_id;
   usbc.get_chip_id(&chip_id);
   Serial.print("FUSB302 ID = 0x");
@@ -101,14 +97,15 @@ void Prompti2c(){
     errorcom =0;
   }
 
+//trying different recipe to see if there is coherent values in CC_meas
   usbc.pd_reset();
-     delay(1000);
+  //   delay(1000);
   //usbc.init();
-     delay(1000);
+  //   delay(1000);
 
 
   int cc1_meas, cc2_meas;
-
+ // define the port configuration and set the variables accordingly
   usbc.get_cc(&cc1_meas, &cc2_meas);
   Serial.print("CC1 level = ");
   switch (cc1_meas) {
@@ -134,7 +131,7 @@ void Prompti2c(){
       Serial.println("Unknown");
       break;
   }
-
+ // define the port configuration and set the variables accordingly
   Serial.print("CC2 level = ");
   switch (cc2_meas) {
     case TYPEC_CC_VOLT_OPEN :
@@ -150,6 +147,8 @@ void Prompti2c(){
       break;
     case TYPEC_CC_VOLT_SNK_DEF :
       Serial.println("Connected with default power");
+      current =0;
+      voltage = 5;
       break;
     case TYPEC_CC_VOLT_SNK_1_5 :
       Serial.println("Connected with 1.5A at 5V");
@@ -178,6 +177,7 @@ void Prompti2c(){
    Serial.println("FIN");
 }
 
+//handles MQTT format msf and sends it
 void sendmsgmqtt(){
 
     
@@ -212,6 +212,7 @@ void sendmsgmqtt(){
     timeMsg = millis();
 }
 
+// handle the access point configuration
 void wifipromptcredentials(){
   while((ssid != NULL) && (ssid[0] == '\0')){
     delay(100);
@@ -254,6 +255,7 @@ server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
   
 }
 
+//set up the wifi connection (if there is no Wifi SSID or password allreally in the variables, it switches to an access point)
 void setupWifi(){
      WiFi.mode(WIFI_AP);
     WiFi.softAP(ssidesp32, passwordesp32);
@@ -285,6 +287,7 @@ Serial.println("HTTP server started and had input");
  
 }
 
+//if communication is lost to the MQTT broker, reconnect procedure
 void reconnect(){
   while (!client.connected()){
     Serial.print("\n connection au broker ");
@@ -301,7 +304,7 @@ void reconnect(){
     }
   }
 }
-
+// callback to recieve mqtt publish
 void callback(char* topic, byte* payload, unsigned int length){
     Serial.print("\n message recu; ");
     Serial.println(topic);
@@ -314,12 +317,15 @@ void callback(char* topic, byte* payload, unsigned int length){
 }
 
 
-
+//setup code here, to run once:
 void setup() {
-  // put your setup code here, to run once:
+  //serial port setting
   Serial.begin(115200);
+  //set GPIO if needed
   pinMode(LED, OUTPUT);
+  //set wifi
   setupWifi();
+  //set Broker and callback
   client.setServer(broker, 707);
   client.setCallback(callback);
   //setup for USBC devboard
@@ -335,14 +341,25 @@ void loop() {
   //go grab the info from charger
   Prompti2c();
    delay(1000);
+   // if disconnected from MQTT broker, retry with procedure
   if (!client.connected()){
     reconnect();
   }
   client.loop();
 
-  // sends each 2 seconds da ta to database
+  // after 2 more seconds data to database
   delay(2000);
   sendmsgmqtt();
-
+// if there is a wifi connection, Flash the led
+if(WiFi.status() != WL_CONNECTED){
+    digitalWrite(LED, LOW);
+  }
+  else
+  {
+  digitalWrite(LED, HIGH);
+  delay(500);
+  digitalWrite(LED, LOW);
+  }
+  
 }
 
